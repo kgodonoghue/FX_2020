@@ -3,6 +3,9 @@
 Created on Wed Oct  2 18:26:16 2019
 
 @author: kgodo
+
+# counter added and time after the limit hit
+
 """
 import pandas as pd
 import numpy as np
@@ -23,8 +26,9 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import confusion_matrix
 import numpy as np
 
-def martFuncBuy(data,cost,SL,TP,multiplier,martSteps,factor,capital,pipBet,startPoint,martLimit):
-
+buy_counter=[]
+def martFuncBuy(data,cost,SL,TP,multiplier,martSteps,factor,capital,pipBet,startPoint,martLimit,tick_count_limit,sample):
+    buy_counter=[]
     SL=SL/factor
     TP=TP/factor
     cost=cost/factor
@@ -33,16 +37,36 @@ def martFuncBuy(data,cost,SL,TP,multiplier,martSteps,factor,capital,pipBet,start
     mBuy=1  
     martCountBuy=1 
     data=np.array(data)
+    data=data[1::sample]
+
+    
+    timer_bit=0
+    tick_count=0
 
 
     for a in range(startPoint,len(data)):     
+          if timer_bit==1:
+              tick_count=tick_count+1
+              if tick_count>tick_count_limit:
+                  tick_count=0
+                  timer_bit=0
+              continue
           
-          if (((data[a]-data[bBuy])>TP and martCountBuy>martSteps) or (martCountBuy==martLimit)):
+            
+          if (((data[a]-data[bBuy])>TP and martCountBuy>martSteps)):
+            buy_counter.append(martCountBuy)
             martCountBuy=1 
             profitArray[a]=mBuy*(data[a]-data[a-1])-mBuy*cost
             mBuy=1
             bBuy=a 
-            print(a) 
+            
+          elif ((martCountBuy==martLimit)):
+            buy_counter.append(martCountBuy)
+            martCountBuy=1 
+            profitArray[a]=mBuy*(data[a]-data[a-1])-mBuy*cost
+            mBuy=1
+            bBuy=a 
+            timer_bit=1 
                               
           elif ((data[a]-data[bBuy])>TP):
             martCountBuy=1            
@@ -64,10 +88,10 @@ def martFuncBuy(data,cost,SL,TP,multiplier,martSteps,factor,capital,pipBet,start
             profitArray[a]=mBuy*(data[a]-data[a-1])               
  
     profitArray=pipBet*profitArray
-    return profitArray
+    return profitArray, buy_counter
 
-def martFuncSell(data,cost,SL,TP,multiplier,martSteps,factor,capital,pipBet,startPoint,martLimit):
-
+def martFuncSell(data,cost,SL,TP,multiplier,martSteps,factor,capital,pipBet,startPoint,martLimit,tick_count_limit,sample ):
+    sell_counter=[]
     SL=SL/factor
     TP=TP/factor
     cost=cost/factor
@@ -76,16 +100,36 @@ def martFuncSell(data,cost,SL,TP,multiplier,martSteps,factor,capital,pipBet,star
     mSell=-1  
     martCountSell=1
     data=np.array(data)
+    data=data[1::sample]
+
+    timer_bit=0
+    tick_count=0
 
 
-    for a in range(startPoint,len(data)):           
+    for a in range(startPoint,len(data)):     
+          
+          if timer_bit==1:
+              tick_count=tick_count+1
+              if tick_count>tick_count_limit:
+                  tick_count=0
+                  timer_bit=0
+              continue       
             
-          if (((data[a]-data[bSell])<-TP and martCountSell>martSteps) or (martCountSell==martLimit)):
+          if (((data[a]-data[bSell])<-TP and martCountSell>martSteps)):
+            sell_counter.append(martCountSell)
             martCountSell=1 
             profitArray[a]=mSell*(data[a]-data[a-1])+mSell*cost
             mSell=-1
             bSell=a 
-            print(a) 
+              
+            
+          elif ((martCountSell==martLimit)):
+            sell_counter.append(martCountSell)
+            martCountSell=1 
+            profitArray[a]=mSell*(data[a]-data[a-1])+mSell*cost
+            mSell=-1
+            bSell=a 
+            timer_bit=1  
                               
           elif ((data[a]-data[bSell])<-TP):
             martCountSell=1            
@@ -107,42 +151,50 @@ def martFuncSell(data,cost,SL,TP,multiplier,martSteps,factor,capital,pipBet,star
             profitArray[a]=mSell*(data[a]-data[a-1])   
    
     profitArray=pipBet*profitArray
-    return profitArray
+    return profitArray, sell_counter
 
 #currency='USDMXN'
 currency='EURUSD'
 #currency='XAUUSD'
 #currency='BITCOIN'
-year_start=2019
-year_stop=2020
+year_start=2017   
+year_stop=2021
 path_data =r'C:/main_folder/FX_trading/Data/' + currency + '/'
 SL=20
-TP=20
+TP=20 
+commision=0.00005
 multiplier=2
-martSteps=2
+martSteps=0
 factor=1000
 capital=10000
 pipBet=2000
 startPoint=1
-martLimit=6
+martLimit=8
 factor=100
+tick_count_limit=0
+sample=1
+year_result=[]
 
 
 if __name__ == '__main__':    
-    for year in range(year_start,year_stop):
-        print(year)
-        data = pd.read_csv(path_data + str(currency) + str(year) + '.csv')
-        cost=abs(data['Ask']-data['Bid']).mean()
-        data = data['Ask']
-        factor=data[1]/100
-        if factor<0.1:
-            factor=10000
-        elif factor<0.5:
-            factor=100
-        else:
-            factor=1
-        #sentiment = data['AskVolume']- data['BidVolume']
-        #sentiment=sentiment.rolling(window=1000).mean()
-        profitArrayBuy=martFuncBuy(data,cost,SL,TP,multiplier,martSteps,factor,capital,pipBet,startPoint,martLimit)
-        profitArraySell=martFuncSell(data,cost,SL,TP,multiplier,martSteps,factor,capital,pipBet,startPoint,martLimit)
-        plt.plot(np.cumsum(profitArrayBuy+profitArraySell)+capital)
+    for martLimit in range(12,13):
+        for year in range(year_start,year_stop):
+            print(year)
+            data = pd.read_csv(path_data + str(currency) + str(year) + '.csv')
+            cost=abs(data['Ask']-data['Bid']).mean()+commision
+            data = data['Ask']
+            factor=data[1]/100
+            if factor<0.1:
+                factor=10000
+            elif factor<0.5: 
+                factor=100
+            else:
+                factor=1  
+            #sentiment = data['AskVolume']- data['BidVolume']
+            #sentiment=sentiment.rolling(window=1000).mean()
+            [profitArrayBuy,buy_counter]=martFuncBuy(data,cost,SL,TP,multiplier,martSteps,factor,capital,pipBet,startPoint,martLimit,tick_count_limit,sample)
+            [profitArraySell,sell_counter]=martFuncSell(data,cost,SL,TP,multiplier,martSteps,factor,capital,pipBet,startPoint,martLimit,tick_count_limit,sample)
+            profitArrayBuy=np.cumsum(profitArrayBuy)
+            profitArraySell=np.cumsum(profitArraySell)
+            year_result.append([martLimit,tick_count_limit,year,profitArrayBuy[len(profitArrayBuy)-1],profitArraySell[len(profitArraySell)-1],profitArrayBuy[len(profitArrayBuy)-1]+profitArraySell[len(profitArraySell)-1]])
+            #plt.plot((profitArrayBuy+profitArraySell)+capital)
