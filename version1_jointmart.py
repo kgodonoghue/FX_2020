@@ -164,6 +164,23 @@ def martFuncSell(data,cost,SL,TP,multiplier,martSteps,factor,capital,pipBet,star
     profitArray=pipBet*profitArray
     return profitArray, sell_counter
 
+
+def factor_data(year,commision):
+    data = pd.read_csv(path_data + str(currency) + str(year) + '.csv')
+    cost=abs(data['Ask']-data['Bid']).mean()
+    data = np.array(data['Ask'] )
+    factor=data[1]/100
+    if factor<0.2:
+        factor=10000
+    elif factor<2: 
+        factor=100
+    elif factor<200:
+        factor=1
+    else:
+        factor=1   
+    cost=cost+(commision/factor)
+    return data, cost, factor
+
 #currency='USDMXN'
 currency='EURUSD'
 #currency='XAUUSD'
@@ -173,8 +190,8 @@ year_stop=2021
 path_data =r'C:/main_folder/FX_trading/Data/' + currency + '/'
 SL=20
 TP=20 
-commision=0.00005
-multiplier=2
+commision=0.5
+multiplier=1.5
 martSteps=0
 capital=10000
 pipBet=2000
@@ -184,8 +201,8 @@ sample=1
 martLimit=8
 year_result=[]
 year_profit_all=pd.DataFrame([])
-martType='antimart'
-#martType='mart'
+#martType='antimart'
+martType='mart'
 year_total=np.array([])
 
 
@@ -193,16 +210,7 @@ if __name__ == '__main__':
     for martLimit in range(martLimit,martLimit+1):
         for year in range(year_start,year_stop):
             print(year)
-            data = pd.read_csv(path_data + str(currency) + str(year) + '.csv')
-            cost=abs(data['Ask']-data['Bid']).mean()+commision
-            data = data['Ask'] 
-            factor=data[1]/100
-            if factor<0.2:
-                factor=10000
-            elif factor<2: 
-                factor=100
-            else:
-                factor=1  
+            [data, cost, factor]=factor_data(year,commision)
             [profitArrayBuy,buy_counter]=martFuncBuy(data,cost,SL,TP,multiplier,martSteps,factor,capital,pipBet,startPoint,martLimit,tick_count_limit,sample,martType)
             [profitArraySell,sell_counter]=martFuncSell(data,cost,SL,TP,multiplier,martSteps,factor,capital,pipBet,startPoint,martLimit,tick_count_limit,sample,martType)            
             year_result.append([martLimit,tick_count_limit,year,profitArrayBuy[len(profitArrayBuy)-1],profitArraySell[len(profitArraySell)-1],profitArrayBuy[len(profitArrayBuy)-1]+profitArraySell[len(profitArraySell)-1]])
